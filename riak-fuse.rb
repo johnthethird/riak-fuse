@@ -63,7 +63,11 @@ class KeyTree
   end
   
   def is_file?(path)
-    !is_dir?(path)
+    node = tree
+    path.split("/").each do |path_part|
+      return false unless node = node[path_part]
+    end
+    true
   end
   
   def list(path)
@@ -77,7 +81,7 @@ class KeyTree
 end  
 
 # Fuse driver for Riak cluster
-class RiakDir
+class RiakDir < FuseFS::FuseDir
   attr_accessor :client, :initial_buckets, :key_trees
   def initialize(host, port, initial_buckets)
     @client = Riak::Client.new(:host => host, :port => port)
@@ -85,13 +89,9 @@ class RiakDir
     @key_trees = {}
   end
   
-  # Cache the trees generated for each bucket, as its expensive
-  def get_tree(bucket)
-    key_trees[bucket] ||= KeyTree.new(client[bucket].keys)
-  end    
-
   #  Read the contents of a path
   def contents(path)
+    debug "Contents: #{path}"
     return initial_buckets if path == "/" 
     bucket, key = parse_path(path)
     if bucket && !key
@@ -104,24 +104,60 @@ class RiakDir
   end
 
   def directory?(path)
+    debug "Directory?: #{path}"
     return true if path == "/"
     bucket, key = parse_path(path)
     bucket && !key ? true : get_tree(bucket).is_dir?(key)
   end
 
   def file?(path)
+    debug "File?: #{path}"
     return false if path == "/"
     bucket, key = parse_path(path)
     bucket && key ? get_tree(bucket).is_file?(key) : false
   end
 
   def read_file(path)
+    debug "ReadFile: #{path}"
     bucket, key = parse_path(path)
     robj = client[bucket].get(key)
-    robj.serialize(robj.data)
+    robj.data
+  end
+  
+  def can_delete?(path); debug "CanDelete? #{path}"; file?(path); end
+  def delete(path)
+    debug "Delete: #{path}"
+    bucket, key = parse_path(path)
+    robj = client[bucket].get(key)
+    robj.delete
+    flush_cache(bucket)
+  end
+  
+  def can_write?(path); debug "CanWrite? #{path}"; true; end
+  def write_to(path, data)
+    debug "WriteTo: #{path}"
+    begin
+      bucket, key = parse_path(path)
+      robj = client[bucket].get_or_new(key)
+      robj.data = data
+      robj.store
+      flush_cache(bucket)
+    rescue Exception => e
+      puts e.to_yaml
+    end
   end
 
   private
+  # Cache the trees generated for each bucket, as its expensive
+  def get_tree(bucket)
+    key_trees[bucket] ||= KeyTree.new(client[bucket].keys)
+  end    
+  
+  def flush_cache(bucket)
+    key_trees[bucket] = nil
+  end
+
+  # Maybe use this to find subsets of keys? TODO
   def matching_keys(regex)
     results = Riak::MapReduce.new(client).add(bucket).map("function(value,keyData,arg) {
                      var re = new RegExp(arg);
