@@ -33,7 +33,7 @@ rescue Exception => e
 end
 
 def debug (msg)
-  puts msg
+  puts msg if @options[:verbose]
 end
 
 # Given an array of filepaths, put them in a tree structure
@@ -154,7 +154,6 @@ class RiakDir < FuseFS::FuseDir
     debug "MakeDir: #{path}"
     bucket, key = parse_path(path)
     robj = client[bucket].get_or_new(key)
-    puts robj.to_yaml
     if !robj.vclock
       robj.content_type = "text/plain"
       robj.data = "riak-fuse directory placeholder"
@@ -175,10 +174,6 @@ class RiakDir < FuseFS::FuseDir
   
   def flush_cache(bucket)
     key_trees[bucket] = nil
-  end
-
-  def escape(bucket_or_key)
-    URI.escape(bucket_or_key).gsub("/", "%2F")
   end
 
   def get_key(bucket, key)
