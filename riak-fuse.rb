@@ -4,6 +4,7 @@ require 'fusefs'
 require 'ripple'
 require 'tree'
 require 'optparse'
+require 'mime/types'
 
 @options = {}
 @options[:mount] = "/mnt/riak"
@@ -137,15 +138,34 @@ class RiakDir < FuseFS::FuseDir
   def write_to(path, data)
     debug "WriteTo: #{path}"
     begin
+      path.match(%r{/([^/]+)$}); filename = $1
       bucket, key = parse_path(path)
       robj = client[bucket].get_or_new(key)
+      robj.content_type = MIME::Types.type_for(filename).to_s
       robj.data = data
-      robj.store
       flush_cache(bucket)
     rescue Exception => e
       puts e.to_yaml
     end
   end
+  
+  def can_mkdir?(path); true; end
+  def mkdir(path)
+    debug "MakeDir: #{path}"
+    bucket, key = parse_path(path)
+    robj = client[bucket].get_or_new(key)
+    puts robj.to_yaml
+    if !robj.vclock
+      robj.content_type = "text/plain"
+      robj.data = "riak-fuse directory placeholder"
+      robj.store
+      flush_cache(bucket)
+    end
+    true
+  end    
+  
+  def can_rmdir?(path); true; end
+  def rmdir(path); true; end
 
   private
   # Cache the trees generated for each bucket, as its expensive
@@ -155,6 +175,20 @@ class RiakDir < FuseFS::FuseDir
   
   def flush_cache(bucket)
     key_trees[bucket] = nil
+  end
+
+  def escape(bucket_or_key)
+    URI.escape(bucket_or_key).gsub("/", "%2F")
+  end
+
+  def get_key(bucket, key)
+    robj = nil
+    begin
+      robj = client[bucket].get(key)
+    rescue Riak::FailedRequest => fr
+        raise fr unless fr.code.to_i == 404
+    end
+    robj
   end
 
   # Maybe use this to find subsets of keys? TODO
