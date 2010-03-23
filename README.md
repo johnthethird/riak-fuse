@@ -29,7 +29,7 @@ Notes
   
 JSAWK
 -----
-If your keys contain JSON data, check out [JSAWK]http://github.com/micha/jsawk for a really cool way to manipulate it from the command line. For example, if you had it and riak-fuse installed, you could do things like:
+If your keys contain JSON data, check out [JSAWK](http://github.com/micha/jsawk) for a really cool way to manipulate it from the command line. For example, if you had it and riak-fuse installed, you could do things like:
 
     cat /mnt/riak/users/* | jsawk 'if (this.city != "Paris") return null'
   
