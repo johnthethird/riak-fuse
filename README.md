@@ -33,7 +33,7 @@ If your keys contain JSON data, check out [JSAWK](http://github.com/micha/jsawk)
 
     cat /mnt/riak/users/* | jsawk 'if (this.city != "Paris") return null'
   
-This code would output the records of users that live in Paris. This is just scratching the surface of what ksawk can do.
+This code would output the records of users that live in Paris. This is just scratching the surface of what jsawk can do.
 
 
 License
