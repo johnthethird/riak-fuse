@@ -13,7 +13,7 @@ require 'mime/types'
 @options[:verbose] = false
 
 opts = OptionParser.new do |opts|
-  opts.banner = "Usage: #{$0} [options]\n\nMounts a Riak cluster using the fusefs Ruby driver. \nRiak keys should look like /foo/bar/file.txt. \nSupports reads only. Requires Ripple gem > 0.6.0\n\n"
+  opts.banner = "Usage: #{$0} [options]\n\nMounts a Riak cluster using the fusefs Ruby driver. \nIf your Riak keys look like /foo/bar/file.txt you can navigate them like you would a filesystem. \nSupports reads only. Requires Ripple gem > 0.6.0\n\n"
   opts.on('-b', '--buckets BUCKETS', Array, "Comma-delimited list of bucket names") {|val| @options[:buckets] = val }
   opts.on('-m', '--mount MOUNT', String, "Mount point for Riak Fuse driver (/mnt/riak)")  {|val| puts val; @options[:mount] = val }  
   opts.on('-H', '--host HOST', String, "Hostname of Riak cluster (localhost)")  {|val| @options[:host] = val}
@@ -32,8 +32,10 @@ rescue Exception => e
   exit 1
 end
 
-def debug (msg)
-  puts msg if @options[:verbose]
+if @options[:verbose]
+  def debug(msg); puts msg; end
+else
+  def debug(msg); end
 end
 
 # Given an array of filepaths, put them in a tree structure
@@ -56,6 +58,7 @@ class KeyTree
   end
 
   def is_dir?(path)
+    #return !is_file?(path)
     node = tree
     path.split("/").each do |path_part|
       return false unless node = node[path_part]
@@ -121,10 +124,17 @@ class RiakDir < FuseFS::FuseDir
   def read_file(path)
     debug "ReadFile: #{path}"
     bucket, key = parse_path(path)
-    robj = client[bucket].get(key)
-    robj.data
+    begin
+      robj = client[bucket].get(key)
+      puts robj.data
+      robj.serialize(robj.data)
+    rescue Exception => e
+      puts "Error reading file: #{e.message}" 
+    end
   end
-  
+
+# TODO implement writing to Riak. What are the semantics? How do directories work? etc
+=begin  
   def can_delete?(path); debug "CanDelete? #{path}"; file?(path); end
   def delete(path)
     debug "Delete: #{path}"
@@ -163,9 +173,9 @@ class RiakDir < FuseFS::FuseDir
     true
   end    
   
-  def can_rmdir?(path); true; end
-  def rmdir(path); true; end
-
+  def can_rmdir?(path); debug "CanRmdir? #{path}"; true; end
+  def rmdir(path); debug "Rmdir: #{path}"; true; end
+=end
   private
   # Cache the trees generated for each bucket, as its expensive
   def get_tree(bucket)
@@ -174,16 +184,6 @@ class RiakDir < FuseFS::FuseDir
   
   def flush_cache(bucket)
     key_trees[bucket] = nil
-  end
-
-  def get_key(bucket, key)
-    robj = nil
-    begin
-      robj = client[bucket].get(key)
-    rescue Riak::FailedRequest => fr
-        raise fr unless fr.code.to_i == 404
-    end
-    robj
   end
 
   # Maybe use this to find subsets of keys? TODO
