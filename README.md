@@ -3,21 +3,22 @@ FUSE Driver for Riak
 
 _*WARNING!!! This is a toy. Do not point it at a cluster you care about. You have been warned.*_
 
+This proof-of-concept will mount your Riak cluster to your *nix filesystem, and allow you to browse the keyspace using standard tools like ls, cd, cat, etc...
+
 Prerequisites
 -------------
   * FUSE drivers for your OS
   * sudo gem install rubytree ripple
 
-
 Installation
 ------------
 
-  git clone http://github.com/johnthethird/riak-fuse.git
-  cd riak-fuse
-  sudo ./riak-fuse.rb -b bucket1,bucket2
-  (Then, in another terminal...)
-  cd /tmp/riak
-  ls
+    git clone http://github.com/johnthethird/riak-fuse.git
+    cd riak-fuse
+    sudo ./riak-fuse.rb -b bucket1,bucket2
+    (Then, in another terminal...)
+    cd /tmp/riak
+    ls
   
 Notes
 -----
@@ -30,7 +31,7 @@ JSAWK
 -----
 If your keys contain JSON data, check out [JSAWK]http://github.com/micha/jsawk for a really cool way to manipulate it from the command line. For example, if you had it and riak-fuse installed, you could do things like:
 
-  cat /mnt/riak/users/* | jsawk 'if (this.city != "Paris") return null'
+    cat /mnt/riak/users/* | jsawk 'if (this.city != "Paris") return null'
   
 This code would output the records of users that live in Paris. This is just scratching the surface of what ksawk can do.
 
